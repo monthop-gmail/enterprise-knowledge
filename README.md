@@ -89,10 +89,17 @@ docs/                       architecture · retrieval · security · evaluation
 ref/                        direction doc ต้นทาง
 ```
 
-## Phase ถัดไป
+## แผนพัฒนา
+
+📋 **[Roadmap: Phase 1–10](https://github.com/monthop-gmail/enterprise-knowledge/issues/22)** ·
+[Milestones](https://github.com/monthop-gmail/enterprise-knowledge/milestones) ·
+[Issues](https://github.com/monthop-gmail/enterprise-knowledge/issues)
 
 Phase 1 (foundation) → 2 (retrieval) → 3 (reranking) → 4 (service boundary) →
 5 (adapters) → 6 (evaluation) → 7 (benchmark) → 8 (security) → 9 (integration กับ agent-platform) →
-10 (production hardening) — รายละเอียดใน §24 ของ direction doc
+10 (production hardening) — ตาม §24 ของ direction doc
 
 Phase 4 ทำไปแล้วบางส่วนในรอบนี้ (service boundary + contract) เพื่อให้ทีมรีวิว boundary ได้ก่อน
+
+⚠️ มี 1 เรื่องที่รอทีมตัดสินใจก่อน Phase 2 จบ:
+[#5 Thai full-text search](https://github.com/monthop-gmail/enterprise-knowledge/issues/5)
