@@ -1,0 +1,14 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+*.egg-info/
+/evaluation/results/
+
+# local Claude Code settings (per-developer, not shared)
+.claude/settings.local.json

@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "enterprise-knowledge"
+version = "0.1.0"
+description = "Knowledge Plane implementation for agent-platform: two-stage hybrid RAG behind a canonical knowledge.search contract"
+requires-python = ">=3.11"
+dependencies = [
+    "psycopg[binary,pool]>=3.2",
+]
+
+[project.optional-dependencies]
+# Kept optional on purpose (§25: "do not tie the Knowledge Plane to a single
+# vendor"). The core contract imports none of these.
+openai = ["openai>=1.30"]
+rerank = ["flashrank>=0.2.9"]
+mcp = ["fastmcp>=2.0"]
+lcel = ["langchain-core>=0.3", "langchain-openai>=0.2"]
+dev = ["pytest>=8.2", "pytest-asyncio>=0.23", "ruff>=0.5", "mypy>=1.10"]
+
+[project.scripts]
+enterprise-knowledge = "enterprise_knowledge.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: requires a live PostgreSQL + pgvector (deselect with -m 'not integration')",
+    "mcp: drives a real MCP session over stdio (deselect with -m 'not mcp')",
+]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests", "evaluation"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RUF"]
+# __all__ is grouped by concern (contract / service / config / errors) rather than
+# sorted alphabetically: the grouping is the documentation.
+ignore = ["RUF022"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src"]
