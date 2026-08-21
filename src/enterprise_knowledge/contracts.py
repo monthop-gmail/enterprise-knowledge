@@ -3,11 +3,22 @@
 Ref: ref/hybrid-rag-prompt-review.md  §10 (Canonical Service), §17 (Latency
 Breakdown), §27 (agents only know `knowledge.search`).
 
-This module is deliberately **stdlib-only**. It is the shared vocabulary between
-`agent-platform` (which owns the contract) and every adapter here; anything that
-imports it must not be forced to install a database driver, a model SDK, or a
+This module is the Python **projection** of the platform's contracts, not their
+source. `agent-platform` owns the wire schema and stores it as YAML + JSON Schema
+only (ADR-0008); it cannot import Python, so nothing here is shipped to it. Each
+consumer repo writes or generates its own types from the same central schema --
+this file is ours.
+
+It is deliberately **stdlib-only** so that any code translating to or from the
+contract can import it without pulling in a database driver, a model SDK or a
 transport library. Adapters translate to/from these types -- they never invent
 their own response shape (§11).
+
+Vocabulary lock (ADR-0017): the one who *acts* is the **actor**; `subject` means
+*what the record is about* and must never be used for the caller. The distinction
+matters more here than almost anywhere else -- ACL-aware retrieval is precisely
+the question of which documents *about other people* this actor may see -- and
+Python has no schema validator to catch the swap, so the guard is the naming.
 """
 
 from __future__ import annotations
@@ -18,6 +29,7 @@ from typing import Any
 
 __all__ = [
     "Principal",
+    "PrincipalType",
     "TenantScope",
     "PolicyContext",
     "MetadataFilter",
@@ -37,11 +49,33 @@ __all__ = [
 # ---------------------------------------------------------------------------
 
 
+class PrincipalType(StrEnum):
+    """`identity/v1#/$defs/Principal.type` -- required by the platform contract."""
+
+    HUMAN = "human"
+    AGENT = "agent"
+    SERVICE = "service"
+
+
 @dataclass(frozen=True, slots=True)
 class Principal:
-    """Who is asking. Supplied by the platform's identity plane, never by the caller."""
+    """The actor: who is asking.
 
-    principal_id: str
+    Supplied by the platform's identity plane, never by the caller. Projection of
+    `identity/v1#/$defs/Principal`, whose required fields are `type` and `id`.
+
+    `roles`/`groups`/`attributes` are local to this repo -- the platform contract
+    does not carry them, and they exist only to feed the ACL scope. Keep them out
+    of anything serialised onto the wire.
+    """
+
+    principal_id: str  # -> identity/v1 `id` (ActorId)
+    type: PrincipalType = PrincipalType.HUMAN
+    display_name: str | None = None
+    # Delegation chain: an agent acting for a human. ADR-0007/identity-v1 rule --
+    # delegation must never widen what the originating principal could see. The
+    # enforcement belongs in resolve_policy() (#16); this field only models it.
+    on_behalf_of: Principal | None = None
     roles: frozenset[str] = frozenset()
     groups: frozenset[str] = frozenset()
     attributes: dict[str, Any] = field(default_factory=dict)

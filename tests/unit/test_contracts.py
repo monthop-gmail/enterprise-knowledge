@@ -19,8 +19,52 @@ from enterprise_knowledge.provenance import to_retrieved_chunk
 from enterprise_knowledge.retrieval import Candidate
 
 
+def test_no_contract_identifier_is_named_subject() -> None:
+    """ADR-0017 vocabulary lock: the caller is the `actor`, never the `subject`.
+
+    In this domain the actor and the person a document is about are different
+    people in exactly the cases that matter, and Python has no schema validator
+    to catch the swap -- so the guard is the naming.
+
+    Checks declared identifiers via the AST rather than raw text, so prose that
+    explains the rule does not trip the rule.
+    """
+    import ast
+
+    import enterprise_knowledge.contracts as contracts
+
+    tree = ast.parse(Path(contracts.__file__).read_text(encoding="utf-8"))
+    names: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef | ast.FunctionDef):
+            names.append(node.name)
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            names.append(node.target.id)
+        elif isinstance(node, ast.Name):
+            names.append(node.id)
+    offenders = [n for n in names if "subject" in n.lower()]
+    assert not offenders, f"use 'actor' instead (ADR-0017): {offenders}"
+
+
+def test_principal_carries_the_platform_required_fields() -> None:
+    """`identity/v1#/$defs/Principal` requires `type` and `id`."""
+    from enterprise_knowledge.contracts import Principal, PrincipalType
+
+    agent = Principal("agent-1", type=PrincipalType.AGENT,
+                      on_behalf_of=Principal("u-1", type=PrincipalType.HUMAN))
+    assert agent.type is PrincipalType.AGENT
+    assert agent.on_behalf_of is not None
+    assert agent.on_behalf_of.type is PrincipalType.HUMAN
+
+
 def test_contracts_module_has_no_third_party_imports() -> None:
-    """The shared vocabulary must stay installable without a driver or SDK."""
+    """The contract projection must stay importable without a driver or SDK.
+
+    Not because `agent-platform` imports it -- that repo holds YAML and JSON
+    Schema only (ADR-0008) and cannot import Python. The reason is local: every
+    adapter and translation layer here has to reach these types, and none of them
+    should inherit psycopg or an SDK to do it.
+    """
     import enterprise_knowledge.contracts as contracts
 
     source = Path(contracts.__file__).read_text(encoding="utf-8")
