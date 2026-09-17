@@ -25,6 +25,17 @@ if TYPE_CHECKING:  # pragma: no cover
 __all__ = ["Storage", "PostgresStorage"]
 
 
+def _import_psycopg() -> Any:
+    try:
+        import psycopg
+    except ImportError as exc:  # pragma: no cover
+        raise StorageError(
+            "psycopg is not installed: pip install -e '.[dev]' or "
+            "pip install 'psycopg[binary,pool]'"
+        ) from exc
+    return psycopg
+
+
 class Storage(Protocol):
     """Connection management + schema lifecycle."""
 
@@ -38,11 +49,20 @@ class Storage(Protocol):
 
 
 class PostgresStorage:
-    """Phase 1: `psycopg` v3 `ConnectionPool` implementation."""
+    """`psycopg` v3 `ConnectionPool` implementation.
+
+    The pool is created on first use rather than in `__init__`, so constructing a
+    `PostgresStorage` never opens a socket. Tests and the CLI can build one, read
+    its settings, and decide not to touch the database at all.
+    """
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self._pool: Any | None = None
+
+    # Fail fast when the database is unreachable: a hung import-time connect is
+    # far harder to diagnose than a refused one.
+    _OPEN_TIMEOUT_SECONDS = 10.0
 
     def _ensure_pool(self) -> Any:
         try:
@@ -53,12 +73,20 @@ class PostgresStorage:
                 "pip install 'psycopg[binary,pool]'"
             ) from exc
         if self._pool is None:
-            self._pool = ConnectionPool(
+            pool = ConnectionPool(
                 conninfo=self.settings.database_url,
                 min_size=self.settings.pool_min_size,
                 max_size=self.settings.pool_max_size,
-                open=True,
+                open=False,
             )
+            try:
+                pool.open(wait=True, timeout=self._OPEN_TIMEOUT_SECONDS)
+            except Exception as exc:
+                pool.close()
+                raise StorageError(
+                    f"could not open a connection pool to the database: {exc}"
+                ) from exc
+            self._pool = pool
         return self._pool
 
     @contextmanager
@@ -108,9 +136,33 @@ class PostgresStorage:
             )
 
     def apply_schema(self, schema_sql: str) -> None:
-        raise NotImplementedError("Phase 1: execute schema.sql against a clean database")
+        """Run a schema script against the database. Idempotent.
+
+        Uses a dedicated autocommit connection rather than one from the pool, for
+        two reasons. The script carries its own `BEGIN`/`COMMIT`, which would
+        collide with the transaction psycopg opens implicitly on a pooled
+        connection; and applying DDL is an administrative one-off, not the
+        workload the pool is sized for, so it has no business consuming a slot or
+        leaving connection state behind.
+        """
+        psycopg = _import_psycopg()
+        try:
+            with (
+                psycopg.connect(self.settings.database_url, autocommit=True) as conn,
+                conn.cursor() as cur,
+            ):
+                cur.execute(schema_sql)
+        except psycopg.Error as exc:
+            raise StorageError(f"applying the schema failed: {exc}") from exc
 
     def close(self) -> None:
+        """Release the pool. Safe to call more than once, and on an unused storage."""
         if self._pool is not None:
             self._pool.close()
             self._pool = None
+
+    def __enter__(self) -> PostgresStorage:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.close()
