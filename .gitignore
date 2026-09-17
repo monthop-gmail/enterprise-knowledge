@@ -12,3 +12,8 @@ build/
 
 # local Claude Code settings (per-developer, not shared)
 .claude/settings.local.json
+
+# MCP server config — carries an Authorization header. This repo is public;
+# committing it would publish the token permanently (GitHub keeps the blob
+# reachable even after the commit is removed). Share .mcp.json.example instead.
+.mcp.json
