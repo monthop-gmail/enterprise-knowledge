@@ -8,7 +8,9 @@ from enterprise_knowledge.retrieval import Candidate, RankedList, RRFFuser
 
 
 def cand(chunk_id: str) -> Candidate:
-    return Candidate(chunk_id=chunk_id, content=chunk_id, metadata={}, document_id=chunk_id)
+    return Candidate(
+        chunk_id=chunk_id, content=chunk_id, metadata={}, document_id=chunk_id, workspace_id="hr"
+    )
 
 
 def test_formula_matches_spec_exactly() -> None:

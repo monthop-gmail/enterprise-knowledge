@@ -209,10 +209,18 @@ class SearchRequest:
 
 @dataclass(frozen=True, slots=True)
 class Provenance:
-    """Where a chunk came from. Required on every result (§10, §3 lifecycle)."""
+    """Where a chunk came from. Required on every result (§10, §3 lifecycle).
+
+    `resource_id` is the id policy speaks in: `policy/v1.action.resource` must be
+    unique within the tenant the decision is evaluated in (ADR-0033). A bare
+    `document_id` is not -- ours is unique per `(tenant, workspace, document)` --
+    so it is namespaced by workspace. See `provenance.build_resource_id`.
+    """
 
     document_id: str
     chunk_id: str
+    workspace_id: str
+    resource_id: str
     source: str | None = None
     chunk_index: int = 0
     ingested_at: str | None = None  # ISO-8601

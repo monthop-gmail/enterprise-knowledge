@@ -1,0 +1,22 @@
+name: contract drift
+
+# Deliberately not part of CI. Drift is news about agent-platform, not about a
+# change made here, so it must not be able to turn someone's branch red. It runs
+# on a schedule and on demand, and failing is how it gets attention.
+on:
+  schedule:
+    - cron: "0 1 * * 1"  # Mondays, 01:00 UTC
+  workflow_dispatch:
+
+jobs:
+  drift:
+    name: pinned contract versions vs upstream
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      # Stdlib only -- no install step, so the check cannot fail for reasons
+      # unrelated to drift.
+      - run: python scripts/check_contract_drift.py

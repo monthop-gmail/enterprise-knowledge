@@ -45,6 +45,9 @@ class Candidate:
     content: str
     metadata: dict[str, Any]
     document_id: str
+    # Required, not defaulted: a chunk with no workspace cannot be given a
+    # tenant-unique resource id, and provenance is not optional (§10).
+    workspace_id: str
     chunk_index: int = 0
     source: str | None = None
     raw_score: float = 0.0  # cosine distance (dense) or ts_rank_cd (sparse)
@@ -147,7 +150,7 @@ def build_stage1_sql(scope: ScopePredicate) -> str:
     """
     return f"""
 WITH dense AS (
-    SELECT id, content, metadata, document_id, chunk_index, source,
+    SELECT id, content, metadata, document_id, workspace_id, chunk_index, source,
            embedding <=> %s::vector AS distance,
            ROW_NUMBER() OVER (ORDER BY embedding <=> %s::vector) AS rank
     FROM langchain_hybrid_docs
@@ -157,7 +160,7 @@ WITH dense AS (
     LIMIT %s
 ),
 sparse AS (
-    SELECT id, content, metadata, document_id, chunk_index, source,
+    SELECT id, content, metadata, document_id, workspace_id, chunk_index, source,
            ts_rank_cd(tsv_content, plainto_tsquery('english', %s)) AS rank_score,
            ROW_NUMBER() OVER (
                ORDER BY ts_rank_cd(tsv_content, plainto_tsquery('english', %s)) DESC
@@ -173,6 +176,7 @@ fused AS (
            COALESCE(d.content, s.content) AS content,
            COALESCE(d.metadata, s.metadata) AS metadata,
            COALESCE(d.document_id, s.document_id) AS document_id,
+           COALESCE(d.workspace_id, s.workspace_id) AS workspace_id,
            COALESCE(d.chunk_index, s.chunk_index) AS chunk_index,
            COALESCE(d.source, s.source) AS source,
            d.rank AS dense_rank,

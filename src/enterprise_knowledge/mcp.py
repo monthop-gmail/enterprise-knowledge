@@ -24,14 +24,47 @@ from typing import Any
 from .contracts import SearchResponse
 from .service import KnowledgeService
 
-__all__ = ["TOOL_NAME", "build_mcp_server", "response_to_tool_payload"]
+__all__ = [
+    "TOOL_NAME",
+    "TOOL_CONTRACT_VERSION",
+    "TOOL_DESCRIPTION",
+    "build_mcp_server",
+    "response_to_tool_payload",
+]
 
+# Already lowercase `[a-z0-9_]`, so ADR-0027's transformation is the identity
+# here. The namespace segment it prepends (`mcp/v1 server_id`) is added by
+# whoever registers the tool, not by this constant -- a ToolId assembled here
+# would be wrong the moment the same tool is served from a second server.
 TOOL_NAME = "search_company_knowledge"
+
+# ADR-0028: a tool response is a contract whose version announcement never
+# reaches the caller reliably, because the tool description is cached on the
+# client for an unknown length of time. The rules that follow from that:
+#
+#   * within a major, keys may be added -- never removed, renamed, or given a
+#     new meaning
+#   * a superseded key stays alongside its replacement until the next major
+#   * the integer appears in *two* places that are cached differently -- the
+#     first line of the tool description (stale on the client) and a top-level
+#     key of each freshly built result (always current)
+#
+# The second copy is what makes a mismatch diagnosable: a caller comparing the
+# two can tell it is holding a stale description instead of guessing.
+TOOL_CONTRACT_VERSION = 1
+
+TOOL_DESCRIPTION = f"""contract {TOOL_CONTRACT_VERSION}
+Search the organisation's knowledge and return passages with provenance and
+citations. Results are scoped to the caller's tenant and workspace; the caller
+cannot widen that scope through arguments."""
 
 
 def response_to_tool_payload(response: SearchResponse) -> dict[str, Any]:
     """Serialise a `SearchResponse` for the wire, preserving the §10 field names."""
     return {
+        # Second of the two copies required by ADR-0028. Built fresh with every
+        # response, so it is the one that is never stale.
+        "contract": TOOL_CONTRACT_VERSION,
         "query": response.query,
         "tenant_id": response.tenant_id,
         "strategy": response.strategy.value,
@@ -43,9 +76,14 @@ def response_to_tool_payload(response: SearchResponse) -> dict[str, Any]:
                 "document_id": doc.provenance.document_id,
                 "chunk_id": doc.provenance.chunk_id,
                 "source": doc.provenance.source,
+                # The id a policy rule names (ADR-0033), namespaced so it is
+                # unique within the tenant the decision is evaluated in.
+                "resource_id": doc.provenance.resource_id,
                 "provenance": {
                     "document_id": doc.provenance.document_id,
                     "chunk_id": doc.provenance.chunk_id,
+                    "workspace_id": doc.provenance.workspace_id,
+                    "resource_id": doc.provenance.resource_id,
                     "chunk_index": doc.provenance.chunk_index,
                     "source": doc.provenance.source,
                     "ingested_at": doc.provenance.ingested_at,
@@ -71,6 +109,10 @@ def response_to_tool_payload(response: SearchResponse) -> dict[str, Any]:
 
 def build_mcp_server(service: KnowledgeService) -> Any:
     """Phase 5: FastMCP server exposing `search_company_knowledge`.
+
+    Register it with `TOOL_DESCRIPTION`, whose first line carries the contract
+    integer (ADR-0028). Do not hand-write a description here: the two copies of
+    that integer have to move together or the diagnostic is worse than useless.
 
     Tool signature (an adapter of `knowledge.search`, §11):
 

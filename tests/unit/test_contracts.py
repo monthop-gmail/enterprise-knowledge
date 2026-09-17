@@ -102,7 +102,7 @@ def test_final_k_cannot_exceed_candidate_k() -> None:
 
 def test_every_result_carries_provenance_and_citation() -> None:
     chunk = to_retrieved_chunk(
-        Candidate("c1", "body", {"title": "Handbook"}, "doc-1", 0, "odoo://hr/1"),
+        Candidate("c1", "body", {"title": "Handbook"}, "doc-1", "hr", 0, "odoo://hr/1"),
         score=0.42,
     )
     assert chunk.provenance.document_id == "doc-1"
@@ -114,7 +114,7 @@ def test_every_result_carries_provenance_and_citation() -> None:
 def test_mcp_payload_uses_contract_field_names(policy) -> None:
     from enterprise_knowledge.contracts import SearchResponse, Timings
 
-    chunk = to_retrieved_chunk(Candidate("c1", "body", {}, "doc-1"), score=1.0)
+    chunk = to_retrieved_chunk(Candidate("c1", "body", {}, "doc-1", "hr"), score=1.0)
     payload = response_to_tool_payload(
         SearchResponse("q", [chunk], Timings(), RetrievalStrategy.HYBRID, "acme")
     )

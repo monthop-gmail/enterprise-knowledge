@@ -1,0 +1,89 @@
+# Which agent-platform contracts this repo aligns with, and at which version.
+#
+# Required by the consumer Definition of Done in ADR-0006. It exists because
+# upstream moves fast -- 13 ADRs landed in the 27 days this repo sat still -- and
+# a mapping table with no version on it is a description of a moving target.
+#
+# `scripts/check_contract_drift.py` compares these against upstream and is run on
+# a schedule rather than on every PR: drift is news about someone else's repo, so
+# it should not be able to turn a green branch red without anyone changing it.
+#
+# When a version here moves, say what changed and what we did about it -- a bump
+# with no note is indistinguishable from one nobody looked at.
+
+consumer: monthop-gmail/enterprise-knowledge
+platform:
+  repo: monthop-gmail/agent-platform
+  # The commit the versions below were read at.
+  read_at_commit: a5138df
+  read_on: 2026-09-17
+
+contracts:
+  identity/v1:
+    version: 1.2.0
+    used_for: Principal, TenantScope, WorkspaceScope
+    notes: >-
+      Principal projected in contracts.py (type, id, on_behalf_of). display_name
+      is modelled but its fate is open -- see ADR-0031 and the question pending
+      with the platform team.
+
+  policy/v1:
+    version: 1.4.0
+    used_for: PolicyContext, CrossWorkspaceGrant, resource ids
+    notes: >-
+      v1.4.0 carries the ADR-0033 rule that `action.resource` must be unique
+      within the tenant. Ours is namespaced by workspace -- see
+      provenance.build_resource_id and tests/unit/test_resource_id.py. The
+      central validator cannot enforce that rule, so those tests are the
+      enforcement.
+
+  event/v1:
+    version: 1.7.1
+    used_for: audit of a search (not emitted yet -- Phase 9)
+    notes: >-
+      DecisionSummary (ADR-0018) must be referenced rather than copied, and a
+      consent evaluation rides on the domain event rather than getting an event
+      type of its own (ADR-0020).
+
+  consent/v1:
+    version: 1.3.0
+    used_for: consent evaluations passed into policy (not consumed yet)
+
+  error/v1:
+    version: 1.1.0
+    used_for: mapping from errors.py
+    notes: ADR-0030 gave `details` rules; enforceable at the producer only.
+
+  tool/v1:
+    version: 1.1.0
+    used_for: MCP tool registration
+    notes: >-
+      ADR-0027 fixes the ToolId transformation. `search_company_knowledge` is
+      already canonical, so the transformation is the identity for us; the
+      namespace segment is added by whoever registers the tool.
+
+  mcp/v1:
+    version: 1.0.0
+    used_for: the MCP adapter
+    notes: >-
+      ADR-0028's tool-response versioning rules are published but not yet in the
+      mcp/v1 schema. Followed anyway -- see mcp.TOOL_CONTRACT_VERSION.
+
+# ADRs read and ruled on, so a later reader does not re-read them to find out
+# they did not apply. "no" here means checked and dismissed, not overlooked.
+adr_review:
+  read_through: ADR-0033
+  applies:
+    ADR-0021: workspace is a scope, not a boundary -- implemented (#24)
+    ADR-0027: ToolId transformation -- tool name verified canonical
+    ADR-0028: tool response versioning -- contract integer in both places
+    ADR-0030: error/v1 details rules -- to apply when errors.py maps to error/v1
+    ADR-0031: display_name is PII in append-only audit -- decision pending
+    ADR-0033: resource must carry its own scope -- implemented
+  does_not_apply:
+    ADR-0022: agent/v1 self-narrowing; this repo builds no agents
+    ADR-0023: model/v1 frozen bindings; no model binding here
+    ADR-0024: capability/v1 tool_calling taxonomy; we declare no capability yet
+    ADR-0025: execution/v1 provider switching; we run no executions
+    ADR-0026: profile/v1 tool ceilings; written by profile authors, not by us
+    ADR-0029: capability/v1 `undoes`; retrieval undoes nothing
