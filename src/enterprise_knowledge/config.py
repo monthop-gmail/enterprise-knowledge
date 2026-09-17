@@ -12,7 +12,20 @@ from dataclasses import dataclass, field
 
 from .errors import ConfigurationError
 
-__all__ = ["RetrievalConfig", "Settings", "load_settings", "configure_logging"]
+__all__ = [
+    "RetrievalConfig",
+    "Settings",
+    "load_settings",
+    "configure_logging",
+    "DEFAULT_DATABASE_URL",
+]
+
+# Declared once and referenced by both the dataclass default and load_settings().
+# Reading `Settings.database_url` to get it back does not work: with slots=True
+# the dataclass turns every field into a slot descriptor, so the class attribute
+# is the descriptor rather than the default value -- silently producing a
+# Settings whose database_url is not a string at all.
+DEFAULT_DATABASE_URL = "postgresql://ek:ek@localhost:55433/enterprise_knowledge"
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,7 +56,7 @@ class RetrievalConfig:
 
 @dataclass(frozen=True, slots=True)
 class Settings:
-    database_url: str = "postgresql://ek:ek@localhost:55433/enterprise_knowledge"
+    database_url: str = DEFAULT_DATABASE_URL
     pool_min_size: int = 1
     pool_max_size: int = 8
 
@@ -78,7 +91,7 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         os.environ.update(env)
 
     settings = Settings(
-        database_url=os.getenv("EK_DATABASE_URL", Settings.database_url),
+        database_url=os.getenv("EK_DATABASE_URL") or DEFAULT_DATABASE_URL,
         pool_min_size=_int("EK_POOL_MIN_SIZE", 1),
         pool_max_size=_int("EK_POOL_MAX_SIZE", 8),
         embedder=os.getenv("EK_EMBEDDER", "deterministic"),

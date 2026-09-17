@@ -26,14 +26,20 @@ provenance และ evaluation — expose ออกไปเป็น call เ�
 | offline embedder | ✅ ครบ |
 | metrics (Hit@K, Recall@K, MRR, leakage, p50/p95) | ✅ ครบ + tests |
 | ground truth fixtures | ✅ ครบ |
-| schema.sql + docker-compose | ✅ ครบ — ตรวจแล้วว่ารันจาก clean DB ได้จริง |
+| schema.sql + docker-compose | ✅ ครบ — มีเทสที่ลง schema ใน DB ใหม่เอี่ยมทุกครั้งที่รัน |
+| `PostgresStorage` (pool + apply_schema) | ✅ ครบ + integration tests |
+| CI (lint · mypy --strict · unit · integration) | ✅ ครบ |
 | stage-1 SQL ยิงกับ PG16+pgvector จริง | ✅ ตรวจแล้ว — tenant/ACL/filter กันได้จริง |
-| SQL execution / ingestion / FlashRank / MCP / LCEL | ⏳ Phase 1–5 |
+| SQL execution / ingestion / FlashRank / MCP / LCEL | ⏳ Phase 2–5 |
 
 ```
-ไม่มี DB : 51 passed ·  6 skipped · 7 xfailed
-มี DB    : 57 passed ·              7 xfailed     (ruff clean)
+unit job        : 57 passed ·  20 deselected      (ruff + mypy --strict clean)
+integration job : 13 passed ·   3 xfailed         (PostgreSQL 16 + pgvector)
 ```
+
+CI รันทั้งสอง job บนทุก PR — `unit` ไม่ต้องมี DB ไม่ต้องมี API key และเป็น gate ของ `integration`
+ส่วน `integration` ยก service container ขึ้นมาแล้วให้ **ชุดเทสเป็นคนลง schema ผ่าน `PostgresStorage.apply_schema()`**
+ไม่ใช่ยิง `psql` ข้ามโค้ดที่อยากให้ถูกทดสอบ · `tests/mcp/` ยังไม่เข้า CI เพราะเป็น xfail ทั้งหมดจนกว่าจะถึง Phase 5
 
 ทุกจุดที่ยังไม่ทำ raise `NotImplementedError` พร้อมระบุ phase — ไม่มี stub ที่คืนค่าปลอมเงียบ ๆ
 
