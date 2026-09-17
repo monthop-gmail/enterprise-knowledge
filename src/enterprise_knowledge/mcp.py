@@ -10,9 +10,11 @@ and nothing else. No `print()`, no library that logs to stdout, no progress bar.
 `configure_logging()` pins every handler to stderr; `tests/mcp/` asserts the
 stream stays clean across a real session.
 
-Identity note: `tenant_id`/`principal_id` arrive from the platform's session
-context, never from a model-authored tool argument -- otherwise an agent could
-name its own tenant and the §4.3 boundary would be advisory (Phase 9).
+Identity note: `tenant_id`, `workspace_id` and `principal_id` arrive from the
+platform's session context, never from a model-authored tool argument --
+otherwise an agent could name its own tenant and the §4.3 boundary would be
+advisory (Phase 9). The same holds for `workspace_id`: widening past the home
+workspace is a policy decision (ADR-0021), and a tool argument is not one.
 """
 
 from __future__ import annotations
@@ -79,11 +81,13 @@ def build_mcp_server(service: KnowledgeService) -> Any:
             final_k: int = 2,
         )
 
-    `department`/`document_type` map onto `SearchRequest.filters`; tenant and
-    principal come from session context, not from these arguments.
+    `department`/`document_type` map onto `SearchRequest.filters` -- both are
+    labels, not scopes (ADR-0007). Tenant, workspace and principal come from
+    session context, not from these arguments.
     """
     raise NotImplementedError(
         "Phase 5: construct FastMCP, register TOOL_NAME, resolve PolicyContext from "
-        "session identity, call service.search(), return response_to_tool_payload(). "
+        "session identity (tenant + workspace + principal), call service.search(), "
+        "return response_to_tool_payload(). "
         "Call configure_logging() before serving so nothing touches stdout."
     )

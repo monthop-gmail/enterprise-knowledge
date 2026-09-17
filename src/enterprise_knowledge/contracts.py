@@ -31,6 +31,8 @@ __all__ = [
     "Principal",
     "PrincipalType",
     "TenantScope",
+    "WorkspaceScope",
+    "CrossWorkspaceGrant",
     "PolicyContext",
     "MetadataFilter",
     "SearchRequest",
@@ -97,6 +99,61 @@ class TenantScope:
 
 
 @dataclass(frozen=True, slots=True)
+class WorkspaceScope:
+    """Where the work lives inside a tenant (`identity/v1#/$defs/WorkspaceId`).
+
+    Not a second tenant. ADR-0021 settles the difference, and it is about
+    *permission to cross*, not about strictness:
+
+    * `tenant_id` cannot be crossed by anyone -- no policy, consent or admin
+      grants it -- and is enforced at the storage layer.
+    * `workspace_id` is denied by default but a policy decision can widen it,
+      and it is enforced at the authorization layer.
+
+    ADR-0007 also settles what a department is: a *label on* a workspace, never
+    a grouping layer of its own. A metadata filter used as a partition is the
+    third layer that ADR forbids, wearing a different name.
+    """
+
+    workspace_id: str
+
+    def __post_init__(self) -> None:
+        if not self.workspace_id or not self.workspace_id.strip():
+            raise ValueError(
+                "workspace_id is required for knowledge (ADR-0007): it is optional only "
+                "for tenant-level events"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class CrossWorkspaceGrant:
+    """A policy decision that widens a search beyond its home workspace.
+
+    `policy_decision_id` is mandatory by design. Crossing a workspace must leave
+    an audit trail naming what allowed it (ADR-0021), and the cheapest way to
+    guarantee that is to make a widened scope unconstructible without the
+    decision it came from -- a `None` here is a type error, not a lint warning.
+
+    Emitting the audit event itself needs `event/v1`, which lands in Phase 9
+    (#17, #25). Until then this type holds the reference that event will carry,
+    so no crossing can happen now and be un-attributable later.
+    """
+
+    policy_decision_id: str
+    workspace_ids: frozenset[str]
+
+    def __post_init__(self) -> None:
+        if not self.policy_decision_id or not self.policy_decision_id.strip():
+            raise ValueError(
+                "cross-workspace access requires the id of the policy decision that "
+                "allowed it: silent widening is indistinguishable from having no "
+                "workspace boundary at all (ADR-0021)"
+            )
+        if not self.workspace_ids:
+            raise ValueError("a grant that widens to nothing is not a grant; omit it instead")
+
+
+@dataclass(frozen=True, slots=True)
 class PolicyContext:
     """Resolved authorization scope for one search.
 
@@ -106,7 +163,11 @@ class PolicyContext:
     """
 
     tenant: TenantScope
+    workspace: WorkspaceScope
     principal: Principal
+    # Set only when a policy decision widened this search past `workspace`.
+    # Absent means the search stays home -- the deny-by-default case.
+    cross_workspace_grant: CrossWorkspaceGrant | None = None
     # Metadata keys/values the principal is allowed to see, e.g.
     # {"classification": ["public", "internal"]}. Empty dict = no extra ACL
     # narrowing beyond the tenant boundary.

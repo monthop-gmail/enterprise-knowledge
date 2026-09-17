@@ -28,8 +28,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--transport", choices=("stdio", "sse"), default="stdio")
     parser.add_argument("--query")
     parser.add_argument("--tenant", help="tenant_id; required for any search (§4.3)")
+    parser.add_argument("--workspace", help="workspace_id; required for knowledge (ADR-0007)")
     parser.add_argument("--principal", default="cli")
-    parser.add_argument("--dept", help="metadata filter: department")
+    # A label on a workspace (ADR-0007), so it filters metadata -- it does not
+    # select a scope. Use --workspace for that.
+    parser.add_argument("--dept", help="metadata label filter: department")
     parser.add_argument("--doc-type", help="metadata filter: document_type")
     parser.add_argument("--top-k", type=int)
     parser.add_argument(

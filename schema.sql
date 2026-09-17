@@ -16,17 +16,28 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- One row = one retrievable chunk.
 --
 -- DEVIATION from the literal field list in §8 (id/content/metadata/embedding/
--- tsv_content): tenant_id, document_id, chunk_index and source are promoted to
--- real columns instead of living inside `metadata`. Rationale: §4.3 requires the
--- tenant boundary to be *hard* -- a JSONB key can be forgotten by a caller, a
--- NOT NULL column cannot. document_id/chunk_index/source are required by the
+-- tsv_content): tenant_id, workspace_id, document_id, chunk_index and source are
+-- promoted to real columns instead of living inside `metadata`. Rationale: §4.3
+-- requires the tenant boundary to be *hard* -- a JSONB key can be forgotten by a
+-- caller, a NOT NULL column cannot. ADR-0007 requires workspace_id on knowledge
+-- for the same reason. document_id/chunk_index/source are required by the
 -- provenance contract (§10) on every single result, so they are not optional
--- metadata either. Everything else stays in `metadata` JSONB.
+-- metadata either. Everything else stays in `metadata` JSONB -- including
+-- `department`, which ADR-0007 defines as a label on a workspace rather than a
+-- grouping layer of its own.
 CREATE TABLE IF NOT EXISTS langchain_hybrid_docs (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
-    -- hard security boundary (§4.3)
+    -- hard security boundary (§4.3): crossable by nobody, enforced here at the
+    -- storage layer.
     tenant_id    TEXT  NOT NULL,
+
+    -- ADR-0021: a scope, not a second boundary. Required (ADR-0007), but denied
+    -- by default at the *authorization* layer rather than sealed at this one --
+    -- a policy decision can widen a search across workspaces, and when it does
+    -- the crossing must be attributable. Hence no RLS for this column, unlike
+    -- tenant_id.
+    workspace_id TEXT  NOT NULL,
 
     -- provenance identity (§10)
     document_id  TEXT  NOT NULL,
@@ -45,7 +56,8 @@ CREATE TABLE IF NOT EXISTS langchain_hybrid_docs (
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT langchain_hybrid_docs_chunk_uniq UNIQUE (tenant_id, document_id, chunk_index)
+    CONSTRAINT langchain_hybrid_docs_chunk_uniq
+        UNIQUE (tenant_id, workspace_id, document_id, chunk_index)
 );
 
 -- ---------------------------------------------------------------------------
@@ -64,9 +76,10 @@ CREATE INDEX IF NOT EXISTS langchain_hybrid_docs_tsv_gin
 CREATE INDEX IF NOT EXISTS langchain_hybrid_docs_metadata_gin
     ON langchain_hybrid_docs USING gin (metadata jsonb_path_ops);
 
--- Tenant pre-filter: every production query is scoped by tenant_id first, so it
--- leads the composite index.
-CREATE INDEX IF NOT EXISTS langchain_hybrid_docs_tenant_doc
-    ON langchain_hybrid_docs (tenant_id, document_id);
+-- Scope pre-filter: every production query is scoped by tenant first and then
+-- workspace, so the composite index follows that order. A cross-workspace search
+-- widens the workspace predicate to `= ANY(...)`, which still uses this index.
+CREATE INDEX IF NOT EXISTS langchain_hybrid_docs_scope
+    ON langchain_hybrid_docs (tenant_id, workspace_id, document_id);
 
 COMMIT;

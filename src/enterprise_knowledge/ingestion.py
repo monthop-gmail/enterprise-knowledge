@@ -11,7 +11,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from .contracts import TenantScope
+from .contracts import TenantScope, WorkspaceScope
 from .embeddings import Embedder
 from .storage import Storage
 
@@ -25,6 +25,7 @@ class SourceDocument:
     document_id: str
     text: str
     tenant: TenantScope
+    workspace: WorkspaceScope
     source: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -37,6 +38,7 @@ class Chunk:
     chunk_index: int
     content: str
     tenant_id: str
+    workspace_id: str
     source: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -44,7 +46,9 @@ class Chunk:
 class Parser(Protocol):
     """Bytes/blob -> SourceDocument. One implementation per connector."""
 
-    def parse(self, blob: bytes, *, tenant: TenantScope, **kwargs: Any) -> SourceDocument: ...
+    def parse(
+        self, blob: bytes, *, tenant: TenantScope, workspace: WorkspaceScope, **kwargs: Any
+    ) -> SourceDocument: ...
 
 
 class Chunker(Protocol):
@@ -61,9 +65,10 @@ class Ingestor(Protocol):
 class PostgresIngestor:
     """Phase 1: chunk -> embed -> upsert into `langchain_hybrid_docs`.
 
-    Upsert keys on `(tenant_id, document_id, chunk_index)` -- the unique
-    constraint in schema.sql -- so re-ingesting a changed document replaces its
-    chunks rather than duplicating them (§3: Feedback -> Re-index).
+    Upsert keys on `(tenant_id, workspace_id, document_id, chunk_index)` -- the
+    unique constraint in schema.sql -- so re-ingesting a changed document replaces
+    its chunks rather than duplicating them (§3: Feedback -> Re-index). The same
+    `document_id` in two workspaces is two documents, not one with a conflict.
     """
 
     def __init__(self, storage: Storage, embedder: Embedder, chunker: Chunker) -> None:
@@ -74,5 +79,5 @@ class PostgresIngestor:
     def ingest(self, documents: Iterable[SourceDocument]) -> int:
         raise NotImplementedError(
             "Phase 1: chunk each document, batch-embed the chunks, and upsert with "
-            "ON CONFLICT (tenant_id, document_id, chunk_index) DO UPDATE"
+            "ON CONFLICT (tenant_id, workspace_id, document_id, chunk_index) DO UPDATE"
         )

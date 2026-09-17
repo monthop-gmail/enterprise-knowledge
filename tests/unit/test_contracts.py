@@ -87,6 +87,14 @@ def test_tenant_scope_has_no_wildcard() -> None:
             TenantScope(value)
 
 
+def test_workspace_scope_has_no_wildcard() -> None:
+    from enterprise_knowledge.contracts import WorkspaceScope
+
+    for value in ("", "   "):
+        with pytest.raises(ValueError):
+            WorkspaceScope(value)
+
+
 def test_final_k_cannot_exceed_candidate_k() -> None:
     with pytest.raises(ConfigurationError):
         RetrievalConfig(candidate_k=5, final_k=10)

@@ -31,8 +31,8 @@ provenance และ evaluation — expose ออกไปเป็น call เ�
 | SQL execution / ingestion / FlashRank / MCP / LCEL | ⏳ Phase 1–5 |
 
 ```
-ไม่มี DB : 40 passed ·  6 skipped · 7 xfailed
-มี DB    : 46 passed ·              7 xfailed     (ruff clean)
+ไม่มี DB : 51 passed ·  6 skipped · 7 xfailed
+มี DB    : 57 passed ·              7 xfailed     (ruff clean)
 ```
 
 ทุกจุดที่ยังไม่ทำ raise `NotImplementedError` พร้อมระบุ phase — ไม่มี stub ที่คืนค่าปลอมเงียบ ๆ
@@ -55,6 +55,7 @@ from enterprise_knowledge import KnowledgeService, SearchRequest, resolve_policy
 
 policy = resolve_policy(
     tenant_id="acme",
+    workspace_id="hr",
     principal=Principal("u-1", roles=frozenset({"staff"})),
     allowed_metadata={"classification": ["public", "internal"]},
 )
@@ -72,6 +73,8 @@ consumer รู้จักแค่ `knowledge.search` — ไม่รู้�
 
 - **ACL ก่อน retrieval** — `ScopePredicate` ถูก splice เข้าไปใน CTE ทั้งสองตัว ไม่ใช่กรองผลลัพธ์ทีหลัง (§4.2)
 - **tenant เป็น hard boundary** — `TenantScope("")` โยน error, `filters={"tenant_id": ...}` โยน error (§4.3)
+- **workspace เป็น scope ไม่ใช่ tenant ตัวที่สอง** — deny by default แต่ policy ขยายได้ และขยายโดยไม่ระบุ
+  `policy_decision_id` สร้าง object ไม่ได้เลย (ADR-0021)
 - **MCP เป็น adapter ไม่ใช่ core** — `mcp.py` แปลง payload อย่างเดียว ไม่มี pipeline ของตัวเอง (§4.1, §11)
 - **retrieval ไม่ generate** — `KnowledgeService` ไม่แตะ LLM, `generation_ms` แยกเสมอ (§13, §17)
 - **leakage เป็น gate ไม่ใช่ score** — `ArmResult.passed` เป็น false ทันทีที่ leak > 0 (§26)

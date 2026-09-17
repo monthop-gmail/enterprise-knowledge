@@ -21,8 +21,10 @@ from __future__ import annotations
 from .config import RetrievalConfig, Settings, configure_logging, load_settings
 from .contracts import (
     Citation,
+    CrossWorkspaceGrant,
     PolicyContext,
     Principal,
+    PrincipalType,
     Provenance,
     RetrievalStage,
     RetrievalStrategy,
@@ -31,6 +33,7 @@ from .contracts import (
     SearchResponse,
     TenantScope,
     Timings,
+    WorkspaceScope,
 )
 from .errors import (
     ConfigurationError,
@@ -56,7 +59,10 @@ __all__ = [
     "RetrievalStrategy",
     "PolicyContext",
     "Principal",
+    "PrincipalType",
     "TenantScope",
+    "WorkspaceScope",
+    "CrossWorkspaceGrant",
     # service
     "KnowledgeService",
     "resolve_policy",

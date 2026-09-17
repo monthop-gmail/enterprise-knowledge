@@ -24,7 +24,7 @@ def principal() -> Principal:
 
 @pytest.fixture
 def policy(principal: Principal):
-    return resolve_policy("acme", principal, {"classification": ["public", "internal"]})
+    return resolve_policy("acme", "hr", principal, {"classification": ["public", "internal"]})
 
 
 @pytest.fixture

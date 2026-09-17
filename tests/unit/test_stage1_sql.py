@@ -18,14 +18,14 @@ SCOPES = [
 
 @pytest.mark.parametrize("allowed,filters", SCOPES)
 def test_bind_arity_matches_placeholders(allowed, filters) -> None:
-    scope = build_scope_predicate(resolve_policy("acme", Principal("u-1"), allowed), filters)
+    scope = build_scope_predicate(resolve_policy("acme", "hr", Principal("u-1"), allowed), filters)
     sql = build_stage1_sql(scope)
     params = build_stage1_params(scope, "q", [0.1, 0.2], RetrievalConfig())
     assert sql.count("%s") == len(params)
 
 
 def test_scope_is_inside_both_ctes_not_applied_after() -> None:
-    scope = build_scope_predicate(resolve_policy("acme", Principal("u-1")))
+    scope = build_scope_predicate(resolve_policy("acme", "hr", Principal("u-1")))
     sql = build_stage1_sql(scope)
     dense_cte = sql.split("sparse AS (")[0]
     sparse_cte = sql.split("sparse AS (")[1].split("fused AS (")[0]
@@ -36,14 +36,14 @@ def test_scope_is_inside_both_ctes_not_applied_after() -> None:
 
 
 def test_uses_cosine_distance_and_ts_rank_cd() -> None:
-    scope = build_scope_predicate(resolve_policy("acme", Principal("u-1")))
+    scope = build_scope_predicate(resolve_policy("acme", "hr", Principal("u-1")))
     sql = build_stage1_sql(scope)
     assert "<=>" in sql, "§5 specifies cosine distance"
     assert "ts_rank_cd(" in sql, "§5 specifies ts_rank_cd for sparse ranking"
 
 
 def test_rrf_denominator_is_configurable_in_sql() -> None:
-    scope = build_scope_predicate(resolve_policy("acme", Principal("u-1")))
+    scope = build_scope_predicate(resolve_policy("acme", "hr", Principal("u-1")))
     sql = build_stage1_sql(scope)
     assert "1.0 / (%s + d.rank)" in sql
     assert "1.0 / (%s + s.rank)" in sql
